@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Accelerometer } from 'expo-sensors';
+import { Accelerometer, LightSensor, Gyroscope } from 'expo-sensors';
 import { getStudySession, getSessionByConcept, reviewFlashcard } from '../api';
 import type { StudySessionResponse, FlashcardStudyResponse } from '../types';
 import Spinner from '../components/ui/Spinner';
@@ -12,9 +12,37 @@ import { COLORS, SPACING, RADIUS, FONT } from '../theme';
 
 function useTimer() {
   const [seconds, setSeconds] = useState(0);
+  const [lightIntensity, setLightIntensity] = useState(0);
+  const [gyro, setGyro] = useState({ x: 0, y: 0, z: 0 });
+  // Timer interval
   useEffect(() => {
     const id = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(id);
+  }, []);
+  // LightSensor for ambient light effect on card border
+  useEffect(() => {
+    let sub: { remove: () => void } | null = null;
+    LightSensor.isAvailableAsync().then((available) => {
+      if (!available) return;
+      LightSensor.setUpdateInterval(200);
+      sub = LightSensor.addListener(({ illuminance }) => {
+        const normalized = Math.min(1, Math.max(0, illuminance / 1000));
+        setLightIntensity(normalized);
+      });
+    }).catch(() => {});
+    return () => { sub?.remove(); };
+  }, []);
+  // Gyroscope for subtle card rotation
+  useEffect(() => {
+    let sub: { remove: () => void } | null = null;
+    Gyroscope.isAvailableAsync().then((available) => {
+      if (!available) return;
+      Gyroscope.setUpdateInterval(100);
+      sub = Gyroscope.addListener(({ x, y, z }) => {
+        setGyro({ x, y, z });
+      });
+    }).catch(() => {});
+    return () => { sub?.remove(); };
   }, []);
   const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
   const ss = String(seconds % 60).padStart(2, '0');
@@ -62,18 +90,21 @@ export default function FlashcardsScreen() {
   useEffect(() => { loadSession(); }, [loadSession]);
 
   useEffect(() => {
-    Accelerometer.setUpdateInterval(150);
-    const subscription = Accelerometer.addListener(({ x, y, z }) => {
-      const totalForce = Math.sqrt(x * x + y * y + z * z);
-      // Shake threshold
-      if (totalForce > 1.8) {
-        setFlipped((prev) => {
-          if (!prev) return true;
-          return prev;
-        });
-      }
-    });
-    return () => subscription.remove();
+    let subscription: { remove: () => void } | null = null;
+    Accelerometer.isAvailableAsync().then((available) => {
+      if (!available) return;
+      Accelerometer.setUpdateInterval(150);
+      subscription = Accelerometer.addListener(({ x, y, z }) => {
+        const totalForce = Math.sqrt(x * x + y * y + z * z);
+        if (totalForce > 1.8) {
+          setFlipped((prev) => {
+            if (!prev) return true;
+            return prev;
+          });
+        }
+      });
+    }).catch(() => {});
+    return () => { subscription?.remove(); };
   }, []);
 
   const currentCard: FlashcardStudyResponse | undefined = session?.flashcards[currentIndex];
@@ -164,7 +195,7 @@ export default function FlashcardsScreen() {
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => !flipped && setFlipped(true)}
-          style={[styles.flashcard, flipped && styles.flashcardFlipped]}
+          style={[styles.flashcard, flipped && styles.flashcardFlipped, { borderColor: `rgba(0,150,255,${lightIntensity})`, transform: [{ rotateX: `${gyro.x * 30}deg` }, { rotateY: `${gyro.y * 30}deg` }] }]}
         >
           {/* Card header */}
           <View style={styles.cardHeader}>

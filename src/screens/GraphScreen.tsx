@@ -145,12 +145,16 @@ export default function GraphScreen() {
   const [tiltY, setTiltY] = useState(0);
 
   useEffect(() => {
-    Accelerometer.setUpdateInterval(32); // ~30fps
-    const subscription = Accelerometer.addListener(({ x, y }) => {
-      setTiltX(x * 60); 
-      setTiltY(y * -60); 
-    });
-    return () => subscription.remove();
+    let subscription: { remove: () => void } | null = null;
+    Accelerometer.isAvailableAsync().then((available) => {
+      if (!available) return;
+      Accelerometer.setUpdateInterval(32); // ~30fps
+      subscription = Accelerometer.addListener(({ x, y }) => {
+        setTiltX(x * 60); 
+        setTiltY(y * -60); 
+      });
+    }).catch(() => {});
+    return () => { subscription?.remove(); };
   }, []);
 
   const panResponder = useRef(

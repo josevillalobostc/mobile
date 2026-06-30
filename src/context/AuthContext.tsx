@@ -70,8 +70,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: payload.role || 'ROLE_USER',
         createdAt: new Date().toISOString(),
       };
-      await SecureStore.setItemAsync('grove_token', res.token);
-      await SecureStore.setItemAsync('grove_user', JSON.stringify(userData));
+      // SecureStore is unavailable on web – don't let it block login
+      try {
+        await SecureStore.setItemAsync('grove_token', res.token);
+        await SecureStore.setItemAsync('grove_user', JSON.stringify(userData));
+      } catch {
+        // Persist failed (e.g. web) – session will work in-memory only
+      }
       setToken(res.token);
       setUser(userData);
     } finally {
