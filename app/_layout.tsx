@@ -30,5 +30,6 @@ export default function RootLayout() {
         </Stack>
       </AuthProvider>
     </GestureHandlerRootView>
+    
   );
 }

@@ -4,6 +4,7 @@ import {
   StyleSheet, Dimensions, PanResponder, ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Accelerometer } from 'expo-sensors';
 import Svg, { Circle, Line, Text as SvgText, G } from 'react-native-svg';
 import * as d3 from 'd3-force';
 
@@ -130,7 +131,7 @@ export default function GraphScreen() {
     setPanX(0);
     setPanY(0);
 
-    return () => sim.stop();
+    return () => { sim.stop(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGraph]);
 
@@ -138,6 +139,19 @@ export default function GraphScreen() {
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const panOffset = useRef({ x: 0, y: 0 });
+
+  // ─── Tilt / Parallax ───────────────────────────────────────────────────────
+  const [tiltX, setTiltX] = useState(0);
+  const [tiltY, setTiltY] = useState(0);
+
+  useEffect(() => {
+    Accelerometer.setUpdateInterval(32); // ~30fps
+    const subscription = Accelerometer.addListener(({ x, y }) => {
+      setTiltX(x * 60); 
+      setTiltY(y * -60); 
+    });
+    return () => subscription.remove();
+  }, []);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -181,7 +195,7 @@ export default function GraphScreen() {
       {/* SVG canvas */}
       <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers}>
         <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
-          <G x={panX} y={panY}>
+          <G x={panX + tiltX} y={panY + tiltY}>
             {/* Links */}
             {simulationLinks.map((link, i) => (
               <Line

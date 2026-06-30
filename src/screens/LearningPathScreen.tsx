@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     fontSize: FONT.xs,
     paddingHorizontal: SPACING.xs,
     paddingVertical: 1,
-    borderRadius: RADIUS.xs ?? 4,
+    borderRadius: 4,
   },
   prereqMore: { color: COLORS.gray500, fontSize: FONT.xs },
   cardRight: { alignItems: 'flex-end', gap: SPACING.xs },

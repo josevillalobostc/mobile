@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Accelerometer } from 'expo-sensors';
 import { getStudySession, getSessionByConcept, reviewFlashcard } from '../api';
 import type { StudySessionResponse, FlashcardStudyResponse } from '../types';
 import Spinner from '../components/ui/Spinner';
@@ -59,6 +60,21 @@ export default function FlashcardsScreen() {
   }, [conceptId]);
 
   useEffect(() => { loadSession(); }, [loadSession]);
+
+  useEffect(() => {
+    Accelerometer.setUpdateInterval(150);
+    const subscription = Accelerometer.addListener(({ x, y, z }) => {
+      const totalForce = Math.sqrt(x * x + y * y + z * z);
+      // Shake threshold
+      if (totalForce > 1.8) {
+        setFlipped((prev) => {
+          if (!prev) return true;
+          return prev;
+        });
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   const currentCard: FlashcardStudyResponse | undefined = session?.flashcards[currentIndex];
   const isFinished = session && currentIndex >= session.flashcards.length;
