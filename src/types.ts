@@ -64,10 +64,10 @@ export interface FlashcardStudyResponse {
   conceptId: string;
   conceptTitle: string;
   conceptTag: string;
-  interval: number;
-  easeFactor: number;
-  nextReviewAt: string;
-  reviewCount: number;
+  interval?: number;
+  easeFactor?: number;
+  nextReviewAt?: string;
+  reviewCount?: number;
 }
 
 export interface StudySessionResponse {
