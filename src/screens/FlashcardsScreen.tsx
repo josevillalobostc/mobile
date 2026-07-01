@@ -12,13 +12,17 @@ import { COLORS, SPACING, RADIUS, FONT } from '../theme';
 
 function useTimer() {
   const [seconds, setSeconds] = useState(0);
+  const [stopped, setStopped] = useState(false);
+
   useEffect(() => {
+    if (stopped) return;
     const id = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [stopped]);
+
   const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
   const ss = String(seconds % 60).padStart(2, '0');
-  return `${mm}:${ss}`;
+  return { time: `${mm}:${ss}`, stop: () => setStopped(true) };
 }
 
 const RATINGS = [
@@ -32,7 +36,7 @@ export default function FlashcardsScreen() {
   const params = useLocalSearchParams<{ conceptId?: string }>();
   const conceptId = params.conceptId;
   const router = useRouter();
-  const timer = useTimer();
+  const { time: timer, stop: stopTimer } = useTimer();
 
   const [session, setSession] = useState<StudySessionResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,6 +67,11 @@ export default function FlashcardsScreen() {
 
   const currentCard: FlashcardStudyResponse | undefined = session?.flashcards[currentIndex];
   const isFinished = session && currentIndex >= session.flashcards.length;
+
+  useEffect(() => {
+    if (isFinished) stopTimer();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFinished]);
 
   useEffect(() => {
     if (flipped || !currentCard || isFinished) return;

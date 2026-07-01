@@ -24,8 +24,9 @@ export default function ClustersScreen() {
   const [conceptsError, setConceptsError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedTagId) { setConcepts(null); return; }
+    if (!selectedTagId) { setConcepts(null); setConceptsError(null); return; }
     setConceptsLoading(true);
+    setConceptsError(null);
     getConceptsByCluster(selectedTagId, 0, 50)
       .then(setConcepts)
       .catch(() => setConceptsError('Failed to load concepts for this cluster'))

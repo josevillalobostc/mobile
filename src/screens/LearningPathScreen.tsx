@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getPublicWorkspace, getLearningPath } from '../api';
+import { getPublicWorkspace, getMyWorkspaces, getLearningPath } from '../api';
 import type { ConceptResponse } from '../types';
 import Spinner from '../components/ui/Spinner';
 import ErrorMessage from '../components/ui/ErrorMessage';
@@ -15,17 +15,23 @@ export default function LearningPathScreen() {
   const [concepts, setConcepts] = useState<ConceptResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    getPublicWorkspace()
-      .then((ws) => {
-        const workspaceId = ws.content[0]?.id;
-        if (!workspaceId) throw new Error('No public workspace found');
+    setError(null);
+    Promise.all([getMyWorkspaces(0, 100), getPublicWorkspace()])
+      .then(([myRes, pubRes]) => {
+        const all = [...(myRes.content || []), ...(pubRes.content || [])];
+        const unique = Array.from(new Map(all.map(w => [w.id, w])).values());
+        const workspaceId = unique[0]?.id;
+        if (!workspaceId) throw new Error('No workspaces found');
         return getLearningPath(workspaceId);
       })
-      .then(setConcepts)
+      .then((data) => {
+        if (!controller.signal.aborted) setConcepts(data);
+      })
       .catch((err) => {
         if (!controller.signal.aborted) {
           const msg = err?.response?.data?.message || err?.message || 'Failed to load learning path';
@@ -36,12 +42,12 @@ export default function LearningPathScreen() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, []);
+  }, [retryCount]);
 
   if (loading) return <Spinner fullScreen />;
   if (error) return (
     <View style={styles.centered}>
-      <ErrorMessage message={error} onRetry={() => { setError(null); setLoading(true); }} />
+      <ErrorMessage message={error} onRetry={() => setRetryCount((c) => c + 1)} />
     </View>
   );
 
@@ -78,7 +84,7 @@ export default function LearningPathScreen() {
                   styles.marker,
                   isFirst ? styles.markerFirst : hasPrereqs ? styles.markerLocked : styles.markerOpen,
                 ]}>
-                  <Text style={styles.markerText}>
+                  <Text style={[styles.markerText, isFirst && styles.markerTextFirst]}>
                     {isFirst ? '✓' : hasPrereqs ? '🔒' : String(index + 1)}
                   </Text>
                 </View>
@@ -174,7 +180,8 @@ const styles = StyleSheet.create({
   markerFirst: { backgroundColor: COLORS.green, borderColor: COLORS.green },
   markerLocked: { borderColor: COLORS.border },
   markerOpen: { borderColor: 'rgba(96,165,250,0.4)', backgroundColor: COLORS.blueDim },
-  markerText: { fontSize: FONT.xs, fontWeight: '700', color: COLORS.dark },
+  markerText: { fontSize: FONT.xs, fontWeight: '700', color: COLORS.white },
+  markerTextFirst: { color: COLORS.dark },
   card: {
     flex: 1,
     backgroundColor: COLORS.surface,

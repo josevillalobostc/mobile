@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  Alert, StyleSheet, FlatList,
+  Alert, StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -110,13 +110,22 @@ export default function ConceptDetailScreen() {
     }
   };
 
-  const handleDeleteComment = async (commentId: string) => {
-    try {
-      await deleteComment(commentId);
-      refetchComments();
-    } catch {
-      Alert.alert('Error', 'Failed to delete comment');
-    }
+  const handleDeleteComment = (commentId: string) => {
+    Alert.alert('Delete Comment', 'Are you sure you want to delete this comment?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteComment(commentId);
+            refetchComments();
+          } catch {
+            Alert.alert('Error', 'Failed to delete comment');
+          }
+        },
+      },
+    ]);
   };
 
   if (loading) return <Spinner fullScreen />;

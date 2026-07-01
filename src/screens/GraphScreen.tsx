@@ -49,8 +49,9 @@ export default function GraphScreen() {
       setError(null);
       const data = await getGraphByWorkspace(selectedWorkspaceId);
       setGraph(data);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || 'Error loading graph');
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(e?.response?.data?.message || e?.message || 'Error loading graph');
     } finally {
       setLoading(false);
     }
@@ -184,13 +185,11 @@ export default function GraphScreen() {
     const original = activeGraph?.nodes.find(n => n.id === node.id);
     if (!original) return;
     setSelectedNode(original);
-    if (!subgraph) {
-      try {
-        const sub = await getNeighborhoodGraph(node.id);
-        setSubgraph(sub);
-      } catch {
-        // ignore
-      }
+    try {
+      const sub = await getNeighborhoodGraph(node.id);
+      setSubgraph(sub);
+    } catch {
+      // ignore — keep showing current graph
     }
   };
 
