@@ -77,6 +77,9 @@ export const getPublicWorkspace = () =>
 export const getWorkspaces = (page = 0, size = 20) =>
   api.get<PageResponse<WorkspaceResponse>>('/workspaces', { params: { page, size } }).then((r) => r.data);
 
+export const getMyWorkspaces = (page = 0, size = 20) =>
+  api.get<PageResponse<WorkspaceResponse>>('/workspaces/mine', { params: { page, size } }).then((r) => r.data);
+
 export const getWorkspace = (id: string) =>
   api.get<WorkspaceResponse>(`/workspaces/${id}`).then((r) => r.data);
 

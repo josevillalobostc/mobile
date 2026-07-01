@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Gyroscope } from 'expo-sensors';
 import { getStudySession, getSessionByConcept, reviewFlashcard } from '../api';
 import type { StudySessionResponse, FlashcardStudyResponse } from '../types';
 import Spinner from '../components/ui/Spinner';
@@ -62,6 +63,27 @@ export default function FlashcardsScreen() {
 
   const currentCard: FlashcardStudyResponse | undefined = session?.flashcards[currentIndex];
   const isFinished = session && currentIndex >= session.flashcards.length;
+
+  useEffect(() => {
+    if (flipped || !currentCard || isFinished) return;
+
+    let subscription: ReturnType<typeof Gyroscope.addListener>;
+    Gyroscope.setUpdateInterval(100);
+    subscription = Gyroscope.addListener(gyroData => {
+      const threshold = 3.5;
+      if (
+        Math.abs(gyroData.x) > threshold ||
+        Math.abs(gyroData.y) > threshold ||
+        Math.abs(gyroData.z) > threshold
+      ) {
+        setFlipped(true);
+      }
+    });
+
+    return () => {
+      if (subscription) subscription.remove();
+    };
+  }, [flipped, currentCard, isFinished]);
   const progress = session ? (reviewed / session.total) * 100 : 0;
   const phase = (currentCard?.reviewCount ?? 0) > 0 ? 'REVIEW PHASE' : 'LEARNING PHASE';
 

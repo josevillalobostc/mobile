@@ -7,8 +7,9 @@ import { useRouter } from 'expo-router';
 import Svg, { Circle, Line, Text as SvgText, G } from 'react-native-svg';
 import * as d3 from 'd3-force';
 
-import { getPublicGraph, getNeighborhoodGraph, searchConcepts } from '../api';
-import type { GraphNode, GraphResponse, ConceptResponse } from '../types';
+import { getPublicGraph, getNeighborhoodGraph, searchConcepts, getMyWorkspaces, getPublicWorkspace, getGraphByWorkspace } from '../api';
+import type { GraphNode, GraphResponse, ConceptResponse, WorkspaceResponse } from '../types';
+import { ScrollView } from 'react-native';
 import { useDebounce } from '../hooks/useDebounce';
 import ErrorMessage from '../components/ui/ErrorMessage';
 import { TagBadge } from '../components/ui/Badge';
@@ -24,18 +25,36 @@ export default function GraphScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([]);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
+
+  useEffect(() => {
+    Promise.all([getMyWorkspaces(0, 100), getPublicWorkspace()])
+      .then(([myRes, pubRes]) => {
+        const all = [...(myRes.content || []), ...(pubRes.content || [])];
+        const unique = Array.from(new Map(all.map(w => [w.id, w])).values());
+        setWorkspaces(unique);
+        if (unique.length > 0) {
+          const pub = unique.find(w => w.name === 'Grove Global Community' || w.isPublic);
+          setSelectedWorkspaceId(pub ? pub.id : unique[0].id);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const loadGraph = useCallback(async () => {
+    if (!selectedWorkspaceId) return;
     try {
       setLoading(true);
       setError(null);
-      const data = await getPublicGraph();
+      const data = await getGraphByWorkspace(selectedWorkspaceId);
       setGraph(data);
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Error loading graph');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedWorkspaceId]);
 
   useEffect(() => { loadGraph(); }, [loadGraph]);
 
@@ -130,7 +149,7 @@ export default function GraphScreen() {
     setPanX(0);
     setPanY(0);
 
-    return () => sim.stop();
+    return () => { sim.stop(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGraph]);
 
@@ -228,6 +247,35 @@ export default function GraphScreen() {
 
       {/* Foreground UI */}
       <View style={styles.uiLayer} pointerEvents="box-none">
+        {/* Workspace Selector */}
+        {workspaces.length > 0 && (
+          <View style={styles.workspaceContainer}>
+             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+              {workspaces.map((ws) => (
+                <TouchableOpacity
+                  key={ws.id}
+                  style={[
+                    styles.workspaceChip,
+                    selectedWorkspaceId === ws.id && styles.workspaceChipSelected
+                  ]}
+                  onPress={() => {
+                    setSelectedWorkspaceId(ws.id);
+                    setSubgraph(null);
+                    setSelectedNode(null);
+                  }}
+                >
+                  <Text style={[
+                    styles.workspaceChipText,
+                    selectedWorkspaceId === ws.id && styles.workspaceChipTextSelected
+                  ]}>
+                    {ws.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Search bar */}
         <View style={styles.searchBar}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -364,7 +412,24 @@ export default function GraphScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.dark },
-  uiLayer: { ...StyleSheet.absoluteFillObject },
+  uiLayer: { ...StyleSheet.absoluteFillObject, paddingTop: SPACING.md },
+  workspaceContainer: {
+    marginBottom: SPACING.xs,
+  },
+  workspaceChip: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  workspaceChipSelected: {
+    backgroundColor: COLORS.purpleDim,
+    borderColor: 'rgba(124,58,237,0.4)',
+  },
+  workspaceChipText: { color: COLORS.gray400, fontSize: FONT.xs },
+  workspaceChipTextSelected: { color: COLORS.purpleLight, fontWeight: '700' },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -4,8 +4,8 @@ import {
   FlatList, StyleSheet, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getConcepts, searchConcepts, createConcept, deleteConcept, getPublicWorkspace } from '../api';
-import type { ConceptResponse, PageResponse } from '../types';
+import { getConcepts, searchConcepts, createConcept, deleteConcept, getPublicWorkspace, getMyWorkspaces } from '../api';
+import type { ConceptResponse, PageResponse, WorkspaceResponse } from '../types';
 import { useFetch } from '../hooks/useFetch';
 import { useDebounce } from '../hooks/useDebounce';
 import Spinner from '../components/ui/Spinner';
@@ -24,6 +24,22 @@ export default function ConceptsScreen() {
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<ConceptResponse | null>(null);
+  const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([]);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
+
+  useEffect(() => {
+    Promise.all([getMyWorkspaces(0, 100), getPublicWorkspace()])
+      .then(([myRes, pubRes]) => {
+        const all = [...(myRes.content || []), ...(pubRes.content || [])];
+        const unique = Array.from(new Map(all.map(w => [w.id, w])).values());
+        setWorkspaces(unique);
+        if (unique.length > 0) {
+          const pub = unique.find(w => w.name === 'Grove Global Community' || w.isPublic);
+          setSelectedWorkspaceId(pub ? pub.id : unique[0].id);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const { data, loading, error, refetch } = useFetch<PageResponse<ConceptResponse>>(
     (signal) => {
@@ -42,10 +58,8 @@ export default function ConceptsScreen() {
     }
     setCreating(true);
     try {
-      const ws = await getPublicWorkspace();
-      const workspaceId = ws.content[0]?.id;
-      if (!workspaceId) throw new Error('No public workspace found');
-      await createConcept({ title: newTitle.trim(), content: newContent.trim(), workspaceId });
+      if (!selectedWorkspaceId) throw new Error('No workspace selected');
+      await createConcept({ title: newTitle.trim(), content: newContent.trim(), workspaceId: selectedWorkspaceId });
       Alert.alert('Success', 'Concept created!');
       setShowCreate(false);
       setNewTitle('');
@@ -187,6 +201,28 @@ export default function ConceptsScreen() {
       >
         <View style={styles.formFields}>
           <View>
+            <Text style={styles.label}>Workspace</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+              {workspaces.map((ws) => (
+                <TouchableOpacity
+                  key={ws.id}
+                  style={[
+                    styles.workspaceChip,
+                    selectedWorkspaceId === ws.id && styles.workspaceChipSelected
+                  ]}
+                  onPress={() => setSelectedWorkspaceId(ws.id)}
+                >
+                  <Text style={[
+                    styles.workspaceChipText,
+                    selectedWorkspaceId === ws.id && styles.workspaceChipTextSelected
+                  ]}>
+                    {ws.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          <View>
             <Text style={styles.label}>Title</Text>
             <TextInput
               value={newTitle}
@@ -310,6 +346,20 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: FONT.base,
   },
+  workspaceChip: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  workspaceChipSelected: {
+    backgroundColor: COLORS.purpleDim,
+    borderColor: 'rgba(124,58,237,0.4)',
+  },
+  workspaceChipText: { color: COLORS.gray400, fontSize: FONT.sm },
+  workspaceChipTextSelected: { color: COLORS.purpleLight, fontWeight: '700' },
   multiline: { minHeight: 80, textAlignVertical: 'top', paddingTop: SPACING.md },
   cancelBtn: {
     paddingHorizontal: SPACING.lg,
