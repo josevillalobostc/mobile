@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Circle, Line, Text as SvgText, G } from 'react-native-svg';
+import { Accelerometer } from 'expo-sensors';
 import * as d3 from 'd3-force';
 
 import { getPublicGraph, getNeighborhoodGraph, searchConcepts, getMyWorkspaces, getPublicWorkspace, getGraphByWorkspace } from '../api';
@@ -97,8 +98,9 @@ export default function GraphScreen() {
     // Stop any running simulation
     simulationRef.current?.stop();
 
-    // Deep-clone so D3 can mutate freely
-    const nodes: any[] = activeGraph.nodes.map(n => ({
+    // Deep-clone so D3 can mutate freely, and deduplicate
+    const uniqueGraphNodes = Array.from(new Map(activeGraph.nodes.map(n => [n.id, n])).values());
+    const nodes: any[] = uniqueGraphNodes.map(n => ({
       ...n,
       x: SCREEN_WIDTH / 2 + (Math.random() - 0.5) * 100,
       y: SCREEN_HEIGHT / 2 + (Math.random() - 0.5) * 100,
@@ -146,7 +148,6 @@ export default function GraphScreen() {
     simulationRef.current = sim;
 
     // Reset pan
-    panOffset.current = { x: 0, y: 0 };
     setPanX(0);
     setPanY(0);
 
@@ -154,31 +155,81 @@ export default function GraphScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGraph]);
 
-  // ─── Panning ───────────────────────────────────────────────────────────────
+  // ─── Panning & Zooming ─────────────────────────────────────────────────────
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
-  const panOffset = useRef({ x: 0, y: 0 });
+  const [scale, setScale] = useState(1);
+
+  const lastTouchRef = useRef<{ x: number, y: number } | null>(null);
+  const lastDistanceRef = useRef<number | null>(null);
+
+  const getDistance = (touches: any) => {
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > 5 || Math.abs(g.dy) > 5,
+      onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        // capture current offset at the start of each gesture
+        lastTouchRef.current = null;
+        lastDistanceRef.current = null;
       },
-      onPanResponderMove: (_, g) => {
-        setPanX(panOffset.current.x + g.dx);
-        setPanY(panOffset.current.y + g.dy);
+      onPanResponderMove: (evt) => {
+        const touches = evt.nativeEvent.touches;
+        if (touches.length === 2) {
+          // Zooming
+          lastTouchRef.current = null;
+          const distance = getDistance(touches);
+          
+          if (lastDistanceRef.current === null) {
+            lastDistanceRef.current = distance;
+          } else {
+            const scaleFactor = distance / lastDistanceRef.current;
+            setScale((prev) => Math.max(0.1, Math.min(5, prev * scaleFactor)));
+            lastDistanceRef.current = distance;
+          }
+        } else if (touches.length === 1) {
+          // Panning
+          lastDistanceRef.current = null;
+          const touch = touches[0];
+          
+          if (lastTouchRef.current === null) {
+            lastTouchRef.current = { x: touch.pageX, y: touch.pageY };
+          } else {
+            const dx = touch.pageX - lastTouchRef.current.x;
+            const dy = touch.pageY - lastTouchRef.current.y;
+            
+            setPanX((prev) => prev + dx);
+            setPanY((prev) => prev + dy);
+            
+            lastTouchRef.current = { x: touch.pageX, y: touch.pageY };
+          }
+        }
       },
-      onPanResponderRelease: (_, g) => {
-        panOffset.current = {
-          x: panOffset.current.x + g.dx,
-          y: panOffset.current.y + g.dy,
-        };
+      onPanResponderRelease: () => {
+        lastTouchRef.current = null;
+        lastDistanceRef.current = null;
+      },
+      onPanResponderTerminate: () => {
+        lastTouchRef.current = null;
+        lastDistanceRef.current = null;
       },
     })
   ).current;
+
+  // ─── Parallax Accelerometer ──────────────────────────────────────────────────
+  const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  
+  useEffect(() => {
+    Accelerometer.setUpdateInterval(40);
+    const subscription = Accelerometer.addListener(data => {
+      // Gentle shift based on tilt
+      setParallax({ x: data.x * -30, y: data.y * 30 });
+    });
+    return () => subscription.remove();
+  }, []);
 
   // ─── Node press ────────────────────────────────────────────────────────────
   const handleNodePress = async (node: any) => {
@@ -199,7 +250,7 @@ export default function GraphScreen() {
       {/* SVG canvas */}
       <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers}>
         <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
-          <G x={panX} y={panY}>
+          <G x={panX + parallax.x} y={panY + parallax.y} scale={scale} originX={SCREEN_WIDTH/2} originY={SCREEN_HEIGHT/2}>
             {/* Links */}
             {simulationLinks.map((link, i) => (
               <Line
