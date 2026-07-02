@@ -6,7 +6,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   getConceptDetail, getRelatedConcepts, getFlashcardsForConcept, getAllPrerequisites,
-  updateConcept, addFlashcardToConcept, setConfidenceLevel, getConceptComments, createComment, deleteComment,
+  updateConcept, addFlashcardToConcept, setConfidenceLevel, getRootComments, createComment, deleteComment,
 } from '../api';
 import type { ConceptDetailResponse, ConceptResponse, FlashcardResponse, CommentResponse } from '../types';
 import { getConfidenceBadge } from '../types';
@@ -17,6 +17,7 @@ import { ConfidenceLevelBadge, TagBadge } from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SPACING, RADIUS, FONT } from '../theme';
+import { ArrowLeft, Edit2, Save, X, BookOpen, Plus, Network, MessageSquare } from 'lucide-react-native';
 
 export default function ConceptDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,11 +39,17 @@ export default function ConceptDetailScreen() {
   const fetchComments = async (page: number, append = false) => {
     if (!id) return;
     try {
-      const pageData = await getConceptComments(id, page, 20);
-      setComments(prev => append ? [...prev, ...pageData.content] : pageData.content);
-      setHasMoreComments(pageData.number < Math.max(1, pageData.totalPages) - 1);
+      const pageData = await getRootComments(id, page, 20);
+      const newComments = Array.isArray(pageData) ? pageData : (pageData?.content || []);
+      setComments(prev => append ? [...prev, ...newComments] : newComments);
+      
+      if (!Array.isArray(pageData) && pageData && typeof pageData.totalPages === 'number') {
+        setHasMoreComments(pageData.number < Math.max(1, pageData.totalPages) - 1);
+      } else {
+        setHasMoreComments(false);
+      }
     } catch (e) {
-      console.error('Failed to fetch comments');
+      console.error('Failed to fetch comments', e);
     }
   };
 
@@ -184,7 +191,7 @@ export default function ConceptDetailScreen() {
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       {/* Back */}
       <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-        <Text style={styles.backText}>← Back</Text>
+        <View style={{flexDirection: "row", alignItems: "center", gap: 6}}><ArrowLeft size={18} color={COLORS.gray400} /><Text style={styles.backText}>Back</Text></View>
       </TouchableOpacity>
 
       {/* Main card */}
@@ -214,7 +221,7 @@ export default function ConceptDetailScreen() {
             style={styles.editBtn}
             onPress={editing ? handleSaveEdit : handleEdit}
           >
-            <Text style={styles.editBtnText}>{editing ? (editSaving ? '...' : '💾') : '✏️'}</Text>
+            {editing ? (editSaving ? <Text style={styles.editBtnText}>...</Text> : <Save size={20} color={COLORS.green} />) : <Edit2 size={20} color={COLORS.gray400} />}
           </TouchableOpacity>
         </View>
 
@@ -286,19 +293,19 @@ export default function ConceptDetailScreen() {
       {/* Flashcards */}
       <View style={styles.card}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>📚 Flashcards</Text>
+          <View style={{flexDirection: "row", alignItems: "center", gap: 8}}><BookOpen size={20} color={COLORS.green} /><Text style={styles.sectionTitle}>Flashcards</Text></View>
           <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
             <TouchableOpacity
               style={styles.smBtn}
               onPress={() => router.push(`/flashcards?conceptId=${id}`)}
             >
-              <Text style={styles.smBtnText}>Study</Text>
+              <View style={{flexDirection: "row", alignItems: "center", gap: 4}}><BookOpen size={14} color={COLORS.gray400} /><Text style={styles.smBtnText}>Study</Text></View>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.smBtn, styles.smBtnPrimary]}
               onPress={() => setShowAddFlashcard(true)}
             >
-              <Text style={[styles.smBtnText, { color: COLORS.white }]}>+ Add</Text>
+              <View style={{flexDirection: "row", alignItems: "center", gap: 4}}><Plus size={14} color={COLORS.white} /><Text style={[styles.smBtnText, { color: COLORS.white }]}>Add</Text></View>
             </TouchableOpacity>
           </View>
         </View>
@@ -339,7 +346,7 @@ export default function ConceptDetailScreen() {
       {/* Related */}
       {related && related.length > 0 && (
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>🌿 RELATED BRANCHES</Text>
+          <View style={{flexDirection: "row", alignItems: "center", gap: 6}}><Network size={14} color={COLORS.gray500} /><Text style={styles.sectionLabel}>RELATED BRANCHES</Text></View>
           <View style={styles.chipRow}>
             {related.slice(0, 8).map((r) => (
               <TouchableOpacity
@@ -359,12 +366,12 @@ export default function ConceptDetailScreen() {
         style={styles.primaryBtn}
         onPress={() => router.push(`/flashcards?conceptId=${id}`)}
       >
-        <Text style={styles.primaryBtnText}>📖 Review Node</Text>
+        <View style={{flexDirection: "row", alignItems: "center", gap: 8}}><BookOpen size={18} color={COLORS.white} /><Text style={styles.primaryBtnText}>Review Node</Text></View>
       </TouchableOpacity>
 
       {/* Comments */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>💬 Comments</Text>
+        <View style={{flexDirection: "row", alignItems: "center", gap: 8}}><MessageSquare size={20} color={COLORS.white} /><Text style={styles.sectionTitle}>Comments</Text></View>
         <View style={styles.commentInput}>
           
           {replyTo && (
@@ -417,7 +424,7 @@ export default function ConceptDetailScreen() {
                   </TouchableOpacity>
                   {comment.authorId === user?.id && (
                     <TouchableOpacity onPress={() => handleDeleteComment(comment.id)}>
-                      <Text style={styles.deleteCommentText}>✕</Text>
+                      <X size={16} color={COLORS.gray600} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -440,7 +447,7 @@ export default function ConceptDetailScreen() {
                     </View>
                     {reply.authorId === user?.id && (
                       <TouchableOpacity onPress={() => handleDeleteComment(reply.id)}>
-                        <Text style={styles.deleteCommentText}>✕</Text>
+                        <X size={16} color={COLORS.gray600} />
                       </TouchableOpacity>
                     )}
                   </View>
