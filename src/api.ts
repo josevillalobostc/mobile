@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import type {
   ConceptDetailResponse,
   ConceptRequest,
@@ -20,15 +21,24 @@ import type {
   WorkspaceResponse,
 } from './types';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1';
+const getDefaultBaseUrl = () => {
+  // Always fallback to the deployed Render backend to prevent physical device localhost errors
+  return 'https://proyecto-1-grove.onrender.com/api/v1';
+};
+
+// Remove any trailing slashes from the .env URL to prevent double slashes in endpoints
+const rawUrl = (process.env.EXPO_PUBLIC_API_URL ?? getDefaultBaseUrl()).trim();
+const API_BASE_URL = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
+console.log("Using API_BASE_URL:", API_BASE_URL);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000,
 });
 
 // ─── Request interceptor: inject token from SecureStore ───────────────────────
 api.interceptors.request.use(async (config) => {
+  console.log(`[Axios Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
   try {
     const token = await SecureStore.getItemAsync('grove_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;

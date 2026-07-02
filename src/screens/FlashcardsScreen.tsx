@@ -81,12 +81,13 @@ export default function FlashcardsScreen() {
     let subscription: ReturnType<typeof Gyroscope.addListener>;
     Gyroscope.setUpdateInterval(100);
     subscription = Gyroscope.addListener(gyroData => {
-      const threshold = 3.5;
+      const threshold = 2.5; // Lowered from 3.5 for easier flipping
       if (
         Math.abs(gyroData.x) > threshold ||
         Math.abs(gyroData.y) > threshold ||
         Math.abs(gyroData.z) > threshold
       ) {
+        console.log(`[SENSOR] Gyroscope triggered card flip! (x: ${gyroData.x.toFixed(2)}, y: ${gyroData.y.toFixed(2)}, z: ${gyroData.z.toFixed(2)})`);
         setFlipped(true);
       }
     });
@@ -102,12 +103,13 @@ export default function FlashcardsScreen() {
     let subscription: ReturnType<typeof Accelerometer.addListener>;
     Accelerometer.setUpdateInterval(100);
     subscription = Accelerometer.addListener(accelData => {
-      const threshold = 1.5; // G-force threshold for shaking
+      const threshold = 1.3; // Lowered from 1.5 G-force threshold for shaking
       if (
         Math.abs(accelData.x) > threshold ||
         Math.abs(accelData.y) > threshold ||
         Math.abs(accelData.z) > threshold
       ) {
+        console.log(`[SENSOR] Accelerometer triggered hint! (x: ${accelData.x.toFixed(2)}, y: ${accelData.y.toFixed(2)}, z: ${accelData.z.toFixed(2)})`);
         setShowHint(true);
       }
     });
@@ -272,6 +274,7 @@ export default function FlashcardsScreen() {
           ))}
         </View>
       </ScrollView>
+
     </View>
   );
 }

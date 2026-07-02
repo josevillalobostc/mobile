@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   Alert, StyleSheet,
@@ -8,7 +8,7 @@ import {
   getConceptDetail, getRelatedConcepts, getFlashcardsForConcept, getAllPrerequisites,
   updateConcept, addFlashcardToConcept, setConfidenceLevel, getRootComments, createComment, deleteComment,
 } from '../api';
-import type { ConceptDetailResponse, ConceptResponse, FlashcardResponse, CommentResponse } from '../types';
+import type { ConceptDetailResponse, ConceptResponse, FlashcardResponse, CommentResponse, PageResponse } from '../types';
 import { getConfidenceBadge } from '../types';
 import { useFetch } from '../hooks/useFetch';
 import Spinner from '../components/ui/Spinner';
@@ -30,40 +30,10 @@ export default function ConceptDetailScreen() {
   const { data: related } = useFetch<ConceptResponse[]>(() => getRelatedConcepts(id!), [id]);
   const { data: prerequisites } = useFetch<ConceptResponse[]>(() => getAllPrerequisites(id!), [id]);
   const { data: flashcards, refetch: refetchFlashcards } = useFetch<FlashcardResponse[]>(() => getFlashcardsForConcept(id!), [id]);
-  
-  const [comments, setComments] = useState<CommentResponse[]>([]);
-  const [commentsPage, setCommentsPage] = useState(0);
-  const [hasMoreComments, setHasMoreComments] = useState(true);
+  const { data: commentsPage, refetch: refetchComments } = useFetch<PageResponse<CommentResponse>>(() => getRootComments(id!), [id]);
+  const comments = commentsPage?.content ?? [];
+
   const [replyTo, setReplyTo] = useState<CommentResponse | null>(null);
-
-  const fetchComments = async (page: number, append = false) => {
-    if (!id) return;
-    try {
-      const pageData = await getRootComments(id, page, 20);
-      const newComments = Array.isArray(pageData) ? pageData : (pageData?.content || []);
-      setComments(prev => append ? [...prev, ...newComments] : newComments);
-      
-      if (!Array.isArray(pageData) && pageData && typeof pageData.totalPages === 'number') {
-        setHasMoreComments(pageData.number < Math.max(1, pageData.totalPages) - 1);
-      } else {
-        setHasMoreComments(false);
-      }
-    } catch (e) {
-      console.error('Failed to fetch comments', e);
-    }
-  };
-
-  useEffect(() => {
-    fetchComments(0);
-  }, [id]);
-
-  const loadMoreComments = () => {
-    if (hasMoreComments) {
-      const nextPage = commentsPage + 1;
-      setCommentsPage(nextPage);
-      fetchComments(nextPage, true);
-    }
-  };
 
 
   const [editing, setEditing] = useState(false);
@@ -144,11 +114,10 @@ export default function ConceptDetailScreen() {
     if (!commentText.trim()) return;
     setCommentLoading(true);
     try {
-      const newComment = await createComment({ content: commentText, conceptId: id!, parentId: replyTo?.id || null });
-      // Optimistic update
-      setComments(prev => [newComment, ...prev]);
+      await createComment({ content: commentText, conceptId: id!, parentId: replyTo?.id || null });
       setCommentText('');
       setReplyTo(null);
+      refetchComments();
     } catch {
       Alert.alert('Error', 'Failed to add comment');
     } finally {
@@ -164,13 +133,11 @@ export default function ConceptDetailScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          // Optimistic update
-          setComments(prev => prev.filter(c => c.id !== commentId && c.parentId !== commentId));
           try {
             await deleteComment(commentId);
+            refetchComments();
           } catch {
             Alert.alert('Error', 'Failed to delete comment');
-            fetchComments(0);
           }
         },
       },
@@ -456,12 +423,6 @@ export default function ConceptDetailScreen() {
               ))}
             </View>
           ))}
-          {hasMoreComments && comments.length > 0 && (
-            <TouchableOpacity style={[styles.smBtn, { alignSelf: 'center', marginTop: SPACING.md }]} onPress={loadMoreComments}>
-              <Text style={[styles.smBtnText, { textAlign: 'center' }]}>Load More</Text>
-            </TouchableOpacity>
-          )}
-
           {comments?.length === 0 && (
             <Text style={styles.emptyText}>No comments yet.</Text>
           )}
