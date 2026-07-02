@@ -6,7 +6,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   getConceptDetail, getRelatedConcepts, getFlashcardsForConcept, getAllPrerequisites,
-  updateConcept, addFlashcardToConcept, setConfidenceLevel, getRootComments, createComment, deleteComment,
+  updateConcept, addFlashcardToConcept, setConfidenceLevel, getConceptComments, createComment, deleteComment,
 } from '../api';
 import type { ConceptDetailResponse, ConceptResponse, FlashcardResponse, CommentResponse } from '../types';
 import { getConfidenceBadge } from '../types';
@@ -29,7 +29,35 @@ export default function ConceptDetailScreen() {
   const { data: related } = useFetch<ConceptResponse[]>(() => getRelatedConcepts(id!), [id]);
   const { data: prerequisites } = useFetch<ConceptResponse[]>(() => getAllPrerequisites(id!), [id]);
   const { data: flashcards, refetch: refetchFlashcards } = useFetch<FlashcardResponse[]>(() => getFlashcardsForConcept(id!), [id]);
-  const { data: comments, refetch: refetchComments } = useFetch<CommentResponse[]>(() => getRootComments(id!), [id]);
+  
+  const [comments, setComments] = useState<CommentResponse[]>([]);
+  const [commentsPage, setCommentsPage] = useState(0);
+  const [hasMoreComments, setHasMoreComments] = useState(true);
+  const [replyTo, setReplyTo] = useState<CommentResponse | null>(null);
+
+  const fetchComments = async (page: number, append = false) => {
+    if (!id) return;
+    try {
+      const pageData = await getConceptComments(id, page, 20);
+      setComments(prev => append ? [...prev, ...pageData.content] : pageData.content);
+      setHasMoreComments(pageData.number < Math.max(1, pageData.totalPages) - 1);
+    } catch (e) {
+      console.error('Failed to fetch comments');
+    }
+  };
+
+  useEffect(() => {
+    fetchComments(0);
+  }, [id]);
+
+  const loadMoreComments = () => {
+    if (hasMoreComments) {
+      const nextPage = commentsPage + 1;
+      setCommentsPage(nextPage);
+      fetchComments(nextPage, true);
+    }
+  };
+
 
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -51,11 +79,18 @@ export default function ConceptDetailScreen() {
     setEditing(true);
   };
 
+  
   const handleSaveEdit = async () => {
     setEditSaving(true);
     try {
+      // Optimistic update
+      if (detail) {
+         detail.title = editTitle;
+         detail.content = editContent;
+      }
       await updateConcept(id!, { title: editTitle, content: editContent });
       setEditing(false);
+      // Silently refetch in background if needed
       refetch();
     } catch {
       Alert.alert('Error', 'Failed to update concept');
@@ -64,14 +99,15 @@ export default function ConceptDetailScreen() {
     }
   };
 
+
   const handleAddFlashcard = async () => {
     if (!fcFront.trim() || !fcBack.trim()) {
       Alert.alert('Error', 'Question and answer are required');
       return;
     }
     const diff = parseInt(fcDifficulty);
-    if (isNaN(diff) || diff < 1 || diff > 5) {
-      Alert.alert('Error', 'Difficulty must be 1-5');
+    if (isNaN(diff) || diff < 1 || diff > 4) {
+      Alert.alert('Error', 'Difficulty must be 1-4');
       return;
     }
     setAddingFlashcard(true);
@@ -96,19 +132,23 @@ export default function ConceptDetailScreen() {
     }
   };
 
+  
   const handleAddComment = async () => {
     if (!commentText.trim()) return;
     setCommentLoading(true);
     try {
-      await createComment({ content: commentText, conceptId: id! });
+      const newComment = await createComment({ content: commentText, conceptId: id!, parentId: replyTo?.id || null });
+      // Optimistic update
+      setComments(prev => [newComment, ...prev]);
       setCommentText('');
-      refetchComments();
+      setReplyTo(null);
     } catch {
       Alert.alert('Error', 'Failed to add comment');
     } finally {
       setCommentLoading(false);
     }
   };
+
 
   const handleDeleteComment = (commentId: string) => {
     Alert.alert('Delete Comment', 'Are you sure you want to delete this comment?', [
@@ -117,11 +157,13 @@ export default function ConceptDetailScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          // Optimistic update
+          setComments(prev => prev.filter(c => c.id !== commentId && c.parentId !== commentId));
           try {
             await deleteComment(commentId);
-            refetchComments();
           } catch {
             Alert.alert('Error', 'Failed to delete comment');
+            fetchComments(0);
           }
         },
       },
@@ -324,6 +366,15 @@ export default function ConceptDetailScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>💬 Comments</Text>
         <View style={styles.commentInput}>
+          
+          {replyTo && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs }}>
+              <Text style={{ color: COLORS.gray400, fontSize: FONT.xs }}>Replying to {replyTo.authorUsername}</Text>
+              <TouchableOpacity onPress={() => setReplyTo(null)}>
+                <Text style={{ color: COLORS.red, fontSize: FONT.xs }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <TextInput
             value={commentText}
             onChangeText={setCommentText}
@@ -343,29 +394,67 @@ export default function ConceptDetailScreen() {
           </TouchableOpacity>
         </View>
         <View style={{ gap: SPACING.sm, marginTop: SPACING.md }}>
-          {comments?.map((comment) => (
-            <View key={comment.id} style={styles.commentCard}>
-              <View style={styles.commentHeader}>
-                <View style={styles.commentAvatar}>
-                  <Text style={styles.commentAvatarText}>
-                    {comment.authorUsername?.[0]?.toUpperCase() || 'U'}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.commentAuthor}>{comment.authorUsername}</Text>
-                  <Text style={styles.commentDate}>
-                    {new Date(comment.createdAt).toLocaleDateString()}
-                  </Text>
-                </View>
-                {comment.authorId === user?.id && (
-                  <TouchableOpacity onPress={() => handleDeleteComment(comment.id)}>
-                    <Text style={styles.deleteCommentText}>✕</Text>
+          
+          {comments
+            .filter(c => !c.parentId) // Only root comments initially
+            .map((comment) => (
+            <View key={comment.id}>
+              <View style={styles.commentCard}>
+                <View style={styles.commentHeader}>
+                  <View style={styles.commentAvatar}>
+                    <Text style={styles.commentAvatarText}>
+                      {comment.authorUsername?.[0]?.toUpperCase() || 'U'}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.commentAuthor}>{comment.authorUsername}</Text>
+                    <Text style={styles.commentDate}>
+                      {new Date(comment.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setReplyTo(comment)} style={{ marginRight: SPACING.md }}>
+                    <Text style={{ color: COLORS.purpleLight, fontSize: FONT.sm, fontWeight: '600' }}>Reply</Text>
                   </TouchableOpacity>
-                )}
+                  {comment.authorId === user?.id && (
+                    <TouchableOpacity onPress={() => handleDeleteComment(comment.id)}>
+                      <Text style={styles.deleteCommentText}>✕</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <Text style={styles.commentContent}>{comment.content}</Text>
               </View>
-              <Text style={styles.commentContent}>{comment.content}</Text>
+              {/* Render Replies */}
+              {comments.filter(c => c.parentId === comment.id).map(reply => (
+                <View key={reply.id} style={[styles.commentCard, { marginLeft: SPACING.xl, marginTop: SPACING.xs }]}>
+                  <View style={styles.commentHeader}>
+                    <View style={styles.commentAvatar}>
+                      <Text style={styles.commentAvatarText}>
+                        {reply.authorUsername?.[0]?.toUpperCase() || 'U'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.commentAuthor}>{reply.authorUsername}</Text>
+                      <Text style={styles.commentDate}>
+                        {new Date(reply.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    {reply.authorId === user?.id && (
+                      <TouchableOpacity onPress={() => handleDeleteComment(reply.id)}>
+                        <Text style={styles.deleteCommentText}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <Text style={styles.commentContent}>{reply.content}</Text>
+                </View>
+              ))}
             </View>
           ))}
+          {hasMoreComments && comments.length > 0 && (
+            <TouchableOpacity style={[styles.smBtn, { alignSelf: 'center', marginTop: SPACING.md }]} onPress={loadMoreComments}>
+              <Text style={[styles.smBtnText, { textAlign: 'center' }]}>Load More</Text>
+            </TouchableOpacity>
+          )}
+
           {comments?.length === 0 && (
             <Text style={styles.emptyText}>No comments yet.</Text>
           )}
@@ -428,7 +517,7 @@ export default function ConceptDetailScreen() {
             />
           </View>
           <View>
-            <Text style={styles.label}>Difficulty (1–5)</Text>
+            <Text style={styles.label}>Difficulty (1–4)</Text>
             <TextInput
               value={fcDifficulty}
               onChangeText={setFcDifficulty}

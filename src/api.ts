@@ -190,11 +190,11 @@ export const deleteTag = (id: string) =>
   api.delete(`/tags/${id}`).then((r) => r.data);
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
-export const getConceptComments = (conceptId: string) =>
-  api.get<PageResponse<CommentResponse>>(`/comments/concept/${conceptId}`).then((r) => r.data.content);
+export const getConceptComments = (conceptId: string, page = 0, size = 20) =>
+  api.get<PageResponse<CommentResponse>>(`/comments/concept/${conceptId}`, { params: { page, size } }).then((r) => r.data);
 
-export const getRootComments = (conceptId: string) =>
-  api.get<PageResponse<CommentResponse>>(`/comments/concept/${conceptId}/root`).then((r) => r.data.content);
+export const getRootComments = (conceptId: string, page = 0, size = 20) =>
+  api.get<PageResponse<CommentResponse>>(`/comments/concept/${conceptId}/root`, { params: { page, size } }).then((r) => r.data);
 
 export const createComment = (data: CommentRequest) =>
   api.post<CommentResponse>('/comments', data).then((r) => r.data);

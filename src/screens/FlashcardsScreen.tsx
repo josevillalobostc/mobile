@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Gyroscope } from 'expo-sensors';
+import { Gyroscope, Accelerometer } from 'expo-sensors';
 import { getStudySession, getSessionByConcept, reviewFlashcard } from '../api';
 import type { StudySessionResponse, FlashcardStudyResponse } from '../types';
 import Spinner from '../components/ui/Spinner';
@@ -44,6 +44,7 @@ export default function FlashcardsScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewed, setReviewed] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [showHint, setShowHint] = useState(false);
   const [ratingLoading, setRatingLoading] = useState(false);
 
   const loadSession = useCallback(async () => {
@@ -55,6 +56,7 @@ export default function FlashcardsScreen() {
       setCurrentIndex(0);
       setReviewed(0);
       setFlipped(false);
+      setShowHint(false);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to load session';
       setError(msg);
@@ -93,6 +95,28 @@ export default function FlashcardsScreen() {
       if (subscription) subscription.remove();
     };
   }, [flipped, currentCard, isFinished]);
+
+  useEffect(() => {
+    if (showHint || !currentCard?.hint || isFinished || flipped) return;
+
+    let subscription: ReturnType<typeof Accelerometer.addListener>;
+    Accelerometer.setUpdateInterval(100);
+    subscription = Accelerometer.addListener(accelData => {
+      const threshold = 1.5; // G-force threshold for shaking
+      if (
+        Math.abs(accelData.x) > threshold ||
+        Math.abs(accelData.y) > threshold ||
+        Math.abs(accelData.z) > threshold
+      ) {
+        setShowHint(true);
+      }
+    });
+
+    return () => {
+      if (subscription) subscription.remove();
+    };
+  }, [showHint, currentCard, isFinished, flipped]);
+
   const progress = session ? (reviewed / session.total) * 100 : 0;
   const phase = (currentCard?.reviewCount ?? 0) > 0 ? 'REVIEW PHASE' : 'LEARNING PHASE';
 
@@ -104,6 +128,7 @@ export default function FlashcardsScreen() {
       setReviewed((r) => r + 1);
       setCurrentIndex((i) => i + 1);
       setFlipped(false);
+      setShowHint(false);
     } catch {
       Alert.alert('Error', 'Failed to submit rating');
     } finally {
@@ -203,7 +228,12 @@ export default function FlashcardsScreen() {
             <Text style={styles.cardText}>
               {flipped ? currentCard?.back : currentCard?.front}
             </Text>
-            {!flipped && currentCard?.hint && (
+            {!flipped && currentCard?.hint && !showHint && (
+              <View style={[styles.hintBadge, { opacity: 0.6 }]}>
+                <Text style={styles.hintText}>📱 Shake device for hint</Text>
+              </View>
+            )}
+            {!flipped && currentCard?.hint && showHint && (
               <View style={styles.hintBadge}>
                 <Text style={styles.hintText}>◈ CONCEPT: {currentCard.hint.toUpperCase()}</Text>
               </View>
