@@ -1,14 +1,9 @@
 import { Tabs, Redirect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import Spinner from '../../src/components/ui/Spinner';
-import { Text } from 'react-native';
+import { View } from 'react-native';
 import { COLORS } from '../../src/theme';
-
-function TabIcon({ label, icon, focused }: { label: string; icon: string; focused: boolean }) {
-  return (
-    <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{icon}</Text>
-  );
-}
+import { Network, Archive, GitBranch, Map as MapIcon, Bell, User } from 'lucide-react-native';
 
 export default function TabsLayout() {
   const { token, initializing } = useAuth();
@@ -37,48 +32,48 @@ export default function TabsLayout() {
         name="graph"
         options={{
           title: 'Graph',
-          headerTitle: '✦ Knowledge Graph',
-          tabBarIcon: ({ focused }) => <TabIcon label="Graph" icon="🕸" focused={focused} />,
+          headerTitle: 'Knowledge Graph',
+          tabBarIcon: ({ color, size }) => <Network color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="concepts"
         options={{
           title: 'Archives',
-          headerTitle: '📦 Archives',
-          tabBarIcon: ({ focused }) => <TabIcon label="Archives" icon="📦" focused={focused} />,
+          headerTitle: 'Archives',
+          tabBarIcon: ({ color, size }) => <Archive color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="clusters"
         options={{
           title: 'Clusters',
-          headerTitle: '🌿 Study Branches',
-          tabBarIcon: ({ focused }) => <TabIcon label="Clusters" icon="🌿" focused={focused} />,
+          headerTitle: 'Study Branches',
+          tabBarIcon: ({ color, size }) => <GitBranch color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="learning-path"
         options={{
           title: 'Path',
-          headerTitle: '🗺 Learning Path',
-          tabBarIcon: ({ focused }) => <TabIcon label="Path" icon="🗺" focused={focused} />,
+          headerTitle: 'Learning Path',
+          tabBarIcon: ({ color, size }) => <MapIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="notifications"
         options={{
           title: 'Alerts',
-          headerTitle: '🔔 Notifications',
-          tabBarIcon: ({ focused }) => <TabIcon label="Alerts" icon="🔔" focused={focused} />,
+          headerTitle: 'Notifications',
+          tabBarIcon: ({ color, size }) => <Bell color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          headerTitle: '👤 Profile',
-          tabBarIcon: ({ focused }) => <TabIcon label="Profile" icon="👤" focused={focused} />,
+          headerTitle: 'Profile',
+          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />
     </Tabs>
