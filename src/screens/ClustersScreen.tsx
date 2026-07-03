@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, FlatList, StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Leaf } from 'lucide-react-native';
 import { getTags, getConceptsByCluster } from '../api';
 import type { Tag, ConceptResponse, PageResponse } from '../types';
 import { useFetch } from '../hooks/useFetch';
@@ -40,7 +41,10 @@ export default function ClustersScreen() {
     <View style={styles.root}>
       {/* Tags sidebar */}
       <View style={styles.sidebar}>
-        <Text style={styles.sidebarTitle}>🌿 Clusters</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.xl, paddingHorizontal: SPACING.md }}>
+        <Leaf size={24} color={COLORS.green} />
+        <Text style={[styles.sidebarTitle, { marginBottom: 0 }]}>Clusters</Text>
+      </View>
         {tagsLoading ? (
           <Spinner size="small" />
         ) : (
@@ -66,7 +70,7 @@ export default function ClustersScreen() {
       <View style={styles.main}>
         {!selectedTagId ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🌿</Text>
+            <Leaf size={48} color={COLORS.gray600} />
             <Text style={styles.emptyTitle}>Select a Cluster</Text>
             <Text style={styles.emptyText}>
               Choose a knowledge cluster from the sidebar to explore its concepts.

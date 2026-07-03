@@ -3,8 +3,9 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Map as MapIcon, Lock, Check } from 'lucide-react-native';
 import { getPublicWorkspace, getMyWorkspaces, getLearningPath } from '../api';
-import type { ConceptResponse } from '../types';
+import type { ConceptResponse, WorkspaceResponse } from '../types';
 import Spinner from '../components/ui/Spinner';
 import ErrorMessage from '../components/ui/ErrorMessage';
 import { TagBadge } from '../components/ui/Badge';
@@ -17,18 +18,30 @@ export default function LearningPathScreen() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
+  const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([]);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
+
   useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
     Promise.all([getMyWorkspaces(0, 100), getPublicWorkspace()])
       .then(([myRes, pubRes]) => {
         const all = [...(myRes.content || []), ...(pubRes.content || [])];
         const unique = Array.from(new Map(all.map(w => [w.id, w])).values());
-        const workspaceId = unique[0]?.id;
-        if (!workspaceId) throw new Error('No workspaces found');
-        return getLearningPath(workspaceId);
+        setWorkspaces(unique);
+        if (unique.length > 0) {
+          const pub = unique.find(w => w.name === 'Grove Global Community' || w.isPublic);
+          setSelectedWorkspaceId(pub ? pub.id : unique[0].id);
+        }
       })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!selectedWorkspaceId) return;
+
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    getLearningPath(selectedWorkspaceId)
       .then((data) => {
         if (!controller.signal.aborted) setConcepts(data);
       })
@@ -42,7 +55,7 @@ export default function LearningPathScreen() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [retryCount]);
+  }, [selectedWorkspaceId, retryCount]);
 
   if (loading) return <Spinner fullScreen />;
   if (error) return (
@@ -56,7 +69,7 @@ export default function LearningPathScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerIcon}>
-          <Text style={styles.headerIconText}>🗺</Text>
+          <MapIcon size={20} color={COLORS.green} />
         </View>
         <View>
           <Text style={styles.headerTitle}>Learning Path</Text>
@@ -65,6 +78,31 @@ export default function LearningPathScreen() {
           </Text>
         </View>
       </View>
+
+      {/* Workspace Selector */}
+      {workspaces.length > 0 && (
+        <View style={styles.workspaceContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 0 }}>
+            {workspaces.map((ws) => (
+              <TouchableOpacity
+                key={ws.id}
+                style={[
+                  styles.workspaceChip,
+                  selectedWorkspaceId === ws.id && styles.workspaceChipSelected
+                ]}
+                onPress={() => setSelectedWorkspaceId(ws.id)}
+              >
+                <Text style={[
+                  styles.workspaceChipText,
+                  selectedWorkspaceId === ws.id && styles.workspaceChipTextSelected
+                ]}>
+                  {ws.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {concepts.length === 0 ? (
         <Text style={styles.emptyText}>No concepts in this workspace yet</Text>
@@ -84,9 +122,15 @@ export default function LearningPathScreen() {
                   styles.marker,
                   isFirst ? styles.markerFirst : hasPrereqs ? styles.markerLocked : styles.markerOpen,
                 ]}>
-                  <Text style={[styles.markerText, isFirst && styles.markerTextFirst]}>
-                    {isFirst ? '✓' : hasPrereqs ? '🔒' : String(index + 1)}
-                  </Text>
+                  {isFirst ? (
+                    <Check size={16} color={COLORS.dark} />
+                  ) : hasPrereqs ? (
+                    <Lock size={14} color={COLORS.gray400} />
+                  ) : (
+                    <Text style={[styles.markerText, isFirst && styles.markerTextFirst]}>
+                      {String(index + 1)}
+                    </Text>
+                  )}
                 </View>
 
                 {/* Card */}
@@ -141,7 +185,22 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.dark },
   content: { padding: SPACING.xl, paddingBottom: SPACING.xxxl },
   centered: { flex: 1, backgroundColor: COLORS.dark, alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.xxl },
+  header: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.xl },
+  workspaceContainer: { marginBottom: SPACING.xl, marginLeft: -SPACING.xl, marginRight: -SPACING.xl, paddingHorizontal: SPACING.xl },
+  workspaceChip: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  workspaceChipSelected: {
+    backgroundColor: COLORS.purpleDim,
+    borderColor: 'rgba(124,58,237,0.4)',
+  },
+  workspaceChipText: { color: COLORS.gray400, fontSize: FONT.xs },
+  workspaceChipTextSelected: { color: COLORS.purpleLight, fontWeight: '700' },
   headerIcon: {
     width: 44,
     height: 44,
@@ -152,7 +211,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerIconText: { fontSize: 20 },
   headerTitle: { color: COLORS.white, fontSize: FONT.xxl, fontWeight: '700' },
   headerSub: { color: COLORS.gray400, fontSize: FONT.sm },
   emptyText: { color: COLORS.gray500, textAlign: 'center', paddingVertical: SPACING.xxl, fontSize: FONT.base },

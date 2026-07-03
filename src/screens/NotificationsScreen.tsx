@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, FlatList, StyleSheet, Alert,
 } from 'react-native';
+import { Bell, Check, Trash2 } from 'lucide-react-native';
 import { getNotifications, markNotificationRead, deleteNotification } from '../api';
 import type { NotificationResponse } from '../types';
 import { useFetch } from '../hooks/useFetch';
@@ -48,7 +49,10 @@ export default function NotificationsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm }}>
-          <Text style={styles.headerTitle}>🔔 Notifications</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.xl }}>
+            <Bell size={24} color={COLORS.white} />
+            <Text style={[styles.headerTitle, { marginBottom: 0 }]}>Notifications</Text>
+          </View>
           {unreadCount > 0 && (
             <View style={styles.unreadBadge}>
               <Text style={styles.unreadText}>{unreadCount} unread</Text>
@@ -61,7 +65,7 @@ export default function NotificationsScreen() {
         <Spinner />
       ) : !data || data.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🔔</Text>
+          <Bell size={40} color={COLORS.gray500} />
           <Text style={styles.emptyText}>No notifications</Text>
         </View>
       ) : (
@@ -85,7 +89,7 @@ export default function NotificationsScreen() {
                     disabled={processing === item.id}
                     style={styles.actionBtn}
                   >
-                    <Text style={styles.actionBtnText}>✓</Text>
+                    <Check size={14} color={COLORS.green} />
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
@@ -93,7 +97,7 @@ export default function NotificationsScreen() {
                   disabled={processing === item.id}
                   style={[styles.actionBtn, styles.deleteBtn]}
                 >
-                  <Text style={styles.deleteBtnText}>🗑</Text>
+                  <Trash2 size={16} color={COLORS.red} />
                 </TouchableOpacity>
               </View>
             </View>

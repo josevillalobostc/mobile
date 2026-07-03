@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import Svg, { Circle, Line, Text as SvgText, G } from 'react-native-svg';
 import { Accelerometer } from 'expo-sensors';
+import { Search, RefreshCw, X, Link as LinkIcon, BookOpen, PenTool } from 'lucide-react-native';
 import * as d3 from 'd3-force';
 
 import { getPublicGraph, getNeighborhoodGraph, searchConcepts, getMyWorkspaces, getPublicWorkspace, getGraphByWorkspace } from '../api';
@@ -226,7 +227,7 @@ export default function GraphScreen() {
     Accelerometer.setUpdateInterval(40);
     const subscription = Accelerometer.addListener(data => {
       // Gentle shift based on tilt
-      setParallax({ x: data.x * -30, y: data.y * 30 });
+      setParallax({ x: data.x * -10, y: data.y * 10 });
     });
     return () => subscription.remove();
   }, []);
@@ -328,7 +329,7 @@ export default function GraphScreen() {
 
         {/* Search bar */}
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Search size={14} color={COLORS.gray600} />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -345,7 +346,7 @@ export default function GraphScreen() {
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.refreshBtn} onPress={loadGraph}>
-            <Text>🔄</Text>
+            <RefreshCw size={14} color={COLORS.gray400} />
           </TouchableOpacity>
         </View>
 
@@ -427,11 +428,14 @@ export default function GraphScreen() {
                   onPress={() => { setSelectedNode(null); setSubgraph(null); }}
                   style={styles.closeBtn}
                 >
-                  <Text style={styles.closeBtnText}>✕</Text>
+                  <X size={20} color={COLORS.gray500} />
                 </TouchableOpacity>
               </View>
               <Text style={styles.detailContent}>{selectedNode.content}</Text>
-              <Text style={styles.detailStat}>🔗 {selectedNode.connectionCount} connections</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <LinkIcon size={12} color={COLORS.gray500} />
+                <Text style={styles.detailStat}>{selectedNode.connectionCount} connections</Text>
+              </View>
               <TouchableOpacity
                 style={styles.openConceptBtn}
                 onPress={() => router.push(`/concept/${selectedNode.id}` as any)}
@@ -442,7 +446,8 @@ export default function GraphScreen() {
                 style={[styles.openConceptBtn, styles.studyBtn]}
                 onPress={() => router.push(`/flashcards?conceptId=${selectedNode.id}` as any)}
               >
-                <Text style={styles.openConceptBtnText}>📖 Study Flashcards</Text>
+                <BookOpen size={14} color={COLORS.white} />
+                <Text style={styles.openConceptBtnText}>Study Flashcards</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -453,7 +458,8 @@ export default function GraphScreen() {
           style={styles.fab}
           onPress={() => router.push('/(tabs)/concepts')}
         >
-          <Text style={styles.fabText}>✏ Capture Note</Text>
+          <PenTool size={14} color="#C4B5FD" />
+          <Text style={styles.fabText}>Capture Note</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -492,7 +498,6 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     gap: SPACING.sm,
   },
-  searchIcon: { fontSize: 14 },
   searchInput: { flex: 1, color: COLORS.white, fontSize: FONT.base },
   fullGraphBtn: {
     backgroundColor: COLORS.surface,
@@ -560,7 +565,6 @@ const styles = StyleSheet.create({
   detailHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: SPACING.sm },
   detailTitle: { color: COLORS.white, fontWeight: '700', fontSize: FONT.base, flex: 1 },
   closeBtn: { padding: SPACING.xs },
-  closeBtnText: { color: COLORS.gray500, fontSize: FONT.md },
   detailContent: { color: COLORS.gray400, fontSize: FONT.xs, lineHeight: 16 },
   detailStat: { color: COLORS.gray500, fontSize: FONT.xs },
   openConceptBtn: {
@@ -568,6 +572,9 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     paddingVertical: SPACING.sm,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
     marginTop: SPACING.sm,
   },
   studyBtn: { backgroundColor: COLORS.greenDim, borderWidth: 1, borderColor: 'rgba(74,222,128,0.3)', marginTop: SPACING.xs },
@@ -582,6 +589,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(124,58,237,0.3)',
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
   fabText: { color: '#C4B5FD', fontWeight: '700', fontSize: FONT.sm },
 });

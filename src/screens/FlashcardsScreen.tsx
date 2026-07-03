@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { BookX, CheckCircle, Smartphone, Target, RefreshCw, Zap, Check, Rocket } from 'lucide-react-native';
 import { Gyroscope, Accelerometer } from 'expo-sensors';
 import { getStudySession, getSessionByConcept, reviewFlashcard } from '../api';
 import type { StudySessionResponse, FlashcardStudyResponse } from '../types';
@@ -81,7 +82,7 @@ export default function FlashcardsScreen() {
     let subscription: ReturnType<typeof Gyroscope.addListener>;
     Gyroscope.setUpdateInterval(100);
     subscription = Gyroscope.addListener(gyroData => {
-      const threshold = 2.5; // Lowered from 3.5 for easier flipping
+      const threshold = 4.5; // Increased for lower sensitivity
       if (
         Math.abs(gyroData.x) > threshold ||
         Math.abs(gyroData.y) > threshold ||
@@ -103,7 +104,7 @@ export default function FlashcardsScreen() {
     let subscription: ReturnType<typeof Accelerometer.addListener>;
     Accelerometer.setUpdateInterval(100);
     subscription = Accelerometer.addListener(accelData => {
-      const threshold = 1.3; // Lowered from 1.5 G-force threshold for shaking
+      const threshold = 2.5; // Increased for lower sensitivity
       if (
         Math.abs(accelData.x) > threshold ||
         Math.abs(accelData.y) > threshold ||
@@ -147,7 +148,7 @@ export default function FlashcardsScreen() {
 
   if (!session || session.total === 0) return (
     <View style={styles.centered}>
-      <Text style={styles.emptyIcon}>📚</Text>
+      <BookX size={48} color={COLORS.gray500} />
       <Text style={styles.emptyTitle}>No cards due</Text>
       <Text style={styles.emptyText}>Great job! Check back later for your next session.</Text>
       <TouchableOpacity style={styles.primaryBtn} onPress={() => router.back()}>
@@ -158,14 +159,15 @@ export default function FlashcardsScreen() {
 
   if (isFinished) return (
     <View style={styles.centered}>
-      <Text style={styles.doneIcon}>✅</Text>
+      <CheckCircle size={56} color={COLORS.green} />
       <Text style={styles.doneTitle}>Session Complete!</Text>
       <Text style={styles.doneText}>
         Reviewed <Text style={{ color: COLORS.green, fontWeight: '700' }}>{reviewed}</Text> cards in {timer}
       </Text>
       <View style={styles.doneActions}>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={loadSession}>
-          <Text style={styles.secondaryBtnText}>🔄 New Session</Text>
+        <TouchableOpacity style={[styles.secondaryBtn, { flexDirection: 'row', alignItems: 'center', gap: 6 }]} onPress={loadSession}>
+          <RefreshCw size={16} color={COLORS.gray300} />
+          <Text style={styles.secondaryBtnText}>New Session</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.primaryBtn} onPress={() => router.back()}>
           <Text style={styles.primaryBtnText}>← Back</Text>
@@ -232,12 +234,14 @@ export default function FlashcardsScreen() {
             </Text>
             {!flipped && currentCard?.hint && !showHint && (
               <View style={[styles.hintBadge, { opacity: 0.6 }]}>
-                <Text style={styles.hintText}>📱 Shake device for hint</Text>
+                <Smartphone size={14} color={COLORS.purpleLight} />
+                <Text style={styles.hintText}>Shake device for hint</Text>
               </View>
             )}
             {!flipped && currentCard?.hint && showHint && (
               <View style={styles.hintBadge}>
-                <Text style={styles.hintText}>◈ CONCEPT: {currentCard.hint.toUpperCase()}</Text>
+                <Target size={14} color={COLORS.purpleLight} />
+                <Text style={styles.hintText}>CONCEPT: {currentCard.hint.toUpperCase()}</Text>
               </View>
             )}
           </View>
@@ -264,9 +268,10 @@ export default function FlashcardsScreen() {
               ]}
             >
               <View style={[styles.ratingIcon, { backgroundColor: flipped ? bg : 'rgba(255,255,255,0.04)' }]}>
-                <Text style={{ color: flipped ? color : COLORS.gray600, fontSize: 18 }}>
-                  {rating === 1 ? '🔄' : rating === 2 ? '⚡' : rating === 3 ? '✓' : '🚀'}
-                </Text>
+                {rating === 1 ? <RefreshCw size={18} color={flipped ? color : COLORS.gray600} /> :
+                 rating === 2 ? <Zap size={18} color={flipped ? color : COLORS.gray600} /> :
+                 rating === 3 ? <Check size={18} color={flipped ? color : COLORS.gray600} /> :
+                 <Rocket size={18} color={flipped ? color : COLORS.gray600} />}
               </View>
               <Text style={[styles.ratingLabel, { color: flipped ? COLORS.white : COLORS.gray600 }]}>{label}</Text>
               <Text style={styles.ratingSublabel}>{sublabel}</Text>
@@ -365,6 +370,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(124,58,237,0.2)',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
   },
   hintText: { color: COLORS.purpleLight, fontSize: FONT.xs },
   cardFooter: {
@@ -393,10 +401,8 @@ const styles = StyleSheet.create({
   },
   ratingLabel: { fontSize: FONT.sm, fontWeight: '700' },
   ratingSublabel: { color: COLORS.gray500, fontSize: FONT.xs },
-  emptyIcon: { fontSize: 48 },
   emptyTitle: { color: COLORS.white, fontSize: FONT.xl, fontWeight: '700' },
   emptyText: { color: COLORS.gray400, fontSize: FONT.base, textAlign: 'center' },
-  doneIcon: { fontSize: 56 },
   doneTitle: { color: COLORS.white, fontSize: FONT.xxl, fontWeight: '700' },
   doneText: { color: COLORS.gray400, fontSize: FONT.base },
   doneActions: { flexDirection: 'row', gap: SPACING.md },

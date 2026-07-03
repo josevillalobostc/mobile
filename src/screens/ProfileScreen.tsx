@@ -3,11 +3,12 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { User, Mail, Shield, Calendar } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SPACING, RADIUS, FONT } from '../theme';
 
 interface InfoRowProps {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   value: string;
 }
@@ -15,7 +16,7 @@ interface InfoRowProps {
 function InfoRow({ icon, label, value }: InfoRowProps) {
   return (
     <View style={styles.infoRow}>
-      <Text style={styles.infoIcon}>{icon}</Text>
+      <View style={styles.infoIcon}>{icon}</View>
       <View>
         <Text style={styles.infoLabel}>{label}</Text>
         <Text style={styles.infoValue}>{value}</Text>
@@ -60,19 +61,21 @@ export default function ProfileScreen() {
           </View>
           <View>
             <Text style={styles.username}>{user?.username}</Text>
-            <Text style={styles.role}>
-              {user?.role?.replace('ROLE_', '') || 'User'}
-            </Text>
+            {user?.role === 'ROLE_ADMIN' && (
+              <Text style={styles.role}>Admin</Text>
+            )}
           </View>
         </View>
 
         <View style={styles.divider} />
 
-        <InfoRow icon="👤" label="Username" value={user?.username || '—'} />
-        <InfoRow icon="📧" label="Email" value={user?.email || '—'} />
-        <InfoRow icon="🛡" label="Role" value={user?.role || '—'} />
+        <InfoRow icon={<User size={16} color={COLORS.gray500} />} label="Username" value={user?.username || '—'} />
+        <InfoRow icon={<Mail size={16} color={COLORS.gray500} />} label="Email" value={user?.email || '—'} />
+        {user?.role === 'ROLE_ADMIN' && (
+          <InfoRow icon={<Shield size={16} color={COLORS.gray500} />} label="Role" value="Admin" />
+        )}
         {user?.createdAt && (
-          <InfoRow icon="📅" label="Member since" value={new Date(user.createdAt).toLocaleDateString()} />
+          <InfoRow icon={<Calendar size={16} color={COLORS.gray500} />} label="Member since" value={new Date(user.createdAt).toLocaleDateString()} />
         )}
       </View>
 
@@ -119,7 +122,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     padding: SPACING.md,
   },
-  infoIcon: { fontSize: 16 },
+  infoIcon: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   infoLabel: { color: COLORS.gray500, fontSize: FONT.xs },
   infoValue: { color: COLORS.white, fontSize: FONT.sm },
   signOutBtn: {

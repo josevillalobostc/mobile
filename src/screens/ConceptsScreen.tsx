@@ -4,6 +4,7 @@ import {
   FlatList, StyleSheet, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Trash2 } from 'lucide-react-native';
 import { getConcepts, searchConcepts, createConcept, deleteConcept, getPublicWorkspace, getMyWorkspaces } from '../api';
 import type { ConceptResponse, PageResponse, WorkspaceResponse } from '../types';
 import { useFetch } from '../hooks/useFetch';
@@ -95,7 +96,7 @@ export default function ConceptsScreen() {
           style={styles.deleteBtn}
           onPress={() => setDeleteTarget(item)}
         >
-          <Text style={styles.deleteIcon}>🗑</Text>
+          <Trash2 size={16} color={COLORS.red} />
         </TouchableOpacity>
       </View>
       <Text style={styles.cardContent} numberOfLines={3}>{item.content}</Text>
@@ -314,7 +315,6 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: SPACING.sm, marginBottom: SPACING.xs },
   cardTitle: { color: COLORS.white, fontWeight: '600', fontSize: FONT.base, flex: 1 },
   deleteBtn: { padding: 4 },
-  deleteIcon: { fontSize: 14 },
   cardContent: { color: COLORS.gray400, fontSize: FONT.xs, lineHeight: 16, marginBottom: SPACING.sm },
   cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tags: { flexDirection: 'row', gap: 4, flexWrap: 'wrap', flex: 1 },

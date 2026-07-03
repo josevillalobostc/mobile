@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
+import { Sparkles } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SPACING, RADIUS, FONT } from '../theme';
 
@@ -61,8 +62,8 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Logo area */}
         <View style={styles.logoArea}>
-          <View style={styles.logoIcon}>
-            <Text style={styles.logoEmoji}>✦</Text>
+          <View style={styles.logoBadge}>
+            <Sparkles size={24} color={COLORS.green} />
           </View>
           <Text style={styles.logoText}>Grove</Text>
         </View>
@@ -168,15 +169,15 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.dark },
   scroll: { flexGrow: 1, padding: SPACING.xl, paddingTop: 64 },
   logoArea: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.xl },
-  logoIcon: {
+  logoBadge: {
     width: 44,
     height: 44,
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.purple,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: SPACING.md,
   },
-  logoEmoji: { color: COLORS.white, fontSize: 20, fontWeight: '900' },
   logoText: { color: COLORS.white, fontSize: FONT.xxxl, fontWeight: '800' },
   tagline: { color: COLORS.white, fontSize: FONT.xxl, fontWeight: '700', marginBottom: SPACING.xl, lineHeight: 34 },
   statsRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.xxl },
