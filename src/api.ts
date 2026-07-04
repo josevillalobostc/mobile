@@ -102,6 +102,12 @@ export const updateWorkspace = (id: string, data: WorkspaceRequest) =>
 export const deleteWorkspace = (id: string) =>
   api.delete(`/workspaces/${id}`).then((r) => r.data);
 
+export const addWorkspaceMember = (workspaceId: string, userId: string) =>
+  api.post(`/workspaces/${workspaceId}/members/${userId}`).then((r) => r.data);
+
+export const removeWorkspaceMember = (workspaceId: string, userId: string) =>
+  api.delete(`/workspaces/${workspaceId}/members/${userId}`).then((r) => r.data);
+
 // ─── Graph ────────────────────────────────────────────────────────────────────
 export const getPublicGraph = () =>
   api.get<GraphResponse>('/concepts/graph/public').then((r) => r.data);
@@ -213,11 +219,11 @@ export const deleteComment = (id: string) =>
   api.delete(`/comments/${id}`).then((r) => r.data);
 
 // ─── Notifications ────────────────────────────────────────────────────────────
-export const getNotifications = (userId: string) =>
-  api.get<NotificationResponse[]>(`/notifications/user/${userId}`).then((r) => r.data);
+export const getNotifications = (userId: string, page = 0, size = 20) =>
+  api.get<PageResponse<NotificationResponse>>(`/notifications/user/${userId}`, { params: { page, size, sort: 'createdAt,desc' } }).then((r) => r.data.content);
 
 export const markNotificationRead = (id: string) =>
-  api.put(`/notifications/${id}/read`).then((r) => r.data);
+  api.put<NotificationResponse>(`/notifications/${id}/read`).then((r) => r.data);
 
 export const deleteNotification = (id: string) =>
   api.delete(`/notifications/${id}`).then((r) => r.data);

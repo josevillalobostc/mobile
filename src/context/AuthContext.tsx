@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { authLogin, authRegister, setUnauthorizedHandler } from '../api';
+import { authLogin, authRegister, setUnauthorizedHandler, getMe } from '../api';
 import type { User } from '../types';
 
 interface AuthContextType {
@@ -58,21 +58,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Refresh user data on load to ensure we have the real UUID, not just the JWT sub
+  useEffect(() => {
+    if (token) {
+      getMe()
+        .then(async (me) => {
+          setUser((prev) => {
+            if (!prev) return prev;
+            const updated = {
+              ...prev,
+              id: me.id || prev.id,
+              email: me.email || prev.email,
+              role: me.role || prev.role,
+              createdAt: me.createdAt || prev.createdAt,
+            };
+            SecureStore.setItemAsync('grove_user', JSON.stringify(updated)).catch(() => {});
+            return updated;
+          });
+        })
+        .catch(() => {
+          // Ignore, handle unauthorized in interceptor
+        });
+    }
+  }, [token]);
+
   const login = async (username: string, password: string) => {
     setLoading(true);
     try {
       const res = await authLogin({ username, password });
+      await SecureStore.setItemAsync('grove_token', res.token);
+      setToken(res.token);
+
+      const me = await getMe();
+
       const payload = parseJwt(res.token);
       const userData: User = {
-        id: payload.sub || payload.userId || '',
-        username: payload.username || username,
-        email: payload.email || '',
-        role: payload.role || 'ROLE_USER',
-        createdAt: new Date().toISOString(),
+        id: me.id || payload.userId || payload.sub || '',
+        username: me.username || payload.username || username,
+        email: me.email || payload.email || '',
+        role: me.role || payload.role || 'ROLE_USER',
+        createdAt: me.createdAt || new Date().toISOString(),
       };
-      await SecureStore.setItemAsync('grove_token', res.token);
+      
       await SecureStore.setItemAsync('grove_user', JSON.stringify(userData));
-      setToken(res.token);
       setUser(userData);
     } finally {
       setLoading(false);

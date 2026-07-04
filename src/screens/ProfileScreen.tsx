@@ -3,7 +3,8 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { User, Mail, Shield, Calendar } from 'lucide-react-native';
+import { User, Mail, Shield, Calendar, Key, Copy } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SPACING, RADIUS, FONT } from '../theme';
 
@@ -71,6 +72,28 @@ export default function ProfileScreen() {
 
         <InfoRow icon={<User size={16} color={COLORS.gray500} />} label="Username" value={user?.username || '—'} />
         <InfoRow icon={<Mail size={16} color={COLORS.gray500} />} label="Email" value={user?.email || '—'} />
+        
+        {user?.id && (
+          <View style={styles.infoRow}>
+            <View style={styles.infoIcon}>
+              <Key size={16} color={COLORS.gray500} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.infoLabel}>User ID</Text>
+              <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="tail">{user.id}</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={async () => {
+                await Clipboard.setStringAsync(user.id);
+                Alert.alert('Copied', 'User ID copied to clipboard');
+              }}
+              style={{ padding: SPACING.xs }}
+            >
+              <Copy size={16} color={COLORS.gray400} />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {user?.role === 'ROLE_ADMIN' && (
           <InfoRow icon={<Shield size={16} color={COLORS.gray500} />} label="Role" value="Admin" />
         )}

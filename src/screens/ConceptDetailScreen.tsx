@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   Alert, StyleSheet,
@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   getConceptDetail, getRelatedConcepts, getFlashcardsForConcept, getAllPrerequisites,
   updateConcept, addFlashcardToConcept, setConfidenceLevel, getRootComments, createComment, deleteComment,
+  addPrerequisite, removePrerequisite, searchConcepts
 } from '../api';
 import type { ConceptDetailResponse, ConceptResponse, FlashcardResponse, CommentResponse, PageResponse } from '../types';
 import { getConfidenceBadge } from '../types';
@@ -28,7 +29,7 @@ export default function ConceptDetailScreen() {
     () => getConceptDetail(id!), [id]
   );
   const { data: related } = useFetch<ConceptResponse[]>(() => getRelatedConcepts(id!), [id]);
-  const { data: prerequisites } = useFetch<ConceptResponse[]>(() => getAllPrerequisites(id!), [id]);
+  const { data: prerequisites, refetch: refetchPrerequisites } = useFetch<ConceptResponse[]>(() => getAllPrerequisites(id!), [id]);
   const { data: flashcards, refetch: refetchFlashcards } = useFetch<FlashcardResponse[]>(() => getFlashcardsForConcept(id!), [id]);
   const { data: commentsPage, refetch: refetchComments } = useFetch<PageResponse<CommentResponse>>(() => getRootComments(id!), [id]);
   const comments = commentsPage?.content ?? [];
@@ -48,6 +49,58 @@ export default function ConceptDetailScreen() {
   const [fcDifficulty, setFcDifficulty] = useState('2');
   const [commentText, setCommentText] = useState('');
   const [commentLoading, setCommentLoading] = useState(false);
+
+  const [showAddPrereq, setShowAddPrereq] = useState(false);
+  const [searchPrereqQuery, setSearchPrereqQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [prereqSearchResults, setPrereqSearchResults] = useState<ConceptResponse[]>([]);
+  const [addingPrereq, setAddingPrereq] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchPrereqQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchPrereqQuery]);
+
+  useEffect(() => {
+    if (!debouncedQuery.trim()) {
+      setPrereqSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    const search = async () => {
+      setIsSearching(true);
+      try {
+        const res = await searchConcepts(debouncedQuery, 0, 10);
+        const filtered = res.content.filter(c => 
+          c.id !== id &&
+          !prerequisites?.some(p => p.id === c.id)
+        );
+        setPrereqSearchResults(filtered);
+      } catch (e) {
+        console.log('Error searching concepts', e);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+    search();
+  }, [debouncedQuery, id, prerequisites]);
+
+  const handleAddPrereq = async (prereqId: string) => {
+    try {
+      setAddingPrereq(true);
+      await addPrerequisite(id!, prereqId);
+      Alert.alert('Success', 'Prerequisite added');
+      refetchPrerequisites();
+    } catch (e) {
+      Alert.alert('Error', 'Failed to add prerequisite');
+    } finally {
+      setAddingPrereq(false);
+      setShowAddPrereq(false);
+    }
+  };
 
   const handleEdit = () => {
     if (!detail) return;
@@ -294,21 +347,43 @@ export default function ConceptDetailScreen() {
       </View>
 
       {/* Prerequisites */}
-      {prerequisites && prerequisites.length > 0 && (
-        <View style={styles.card}>
+      <View style={styles.card}>
+        <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionLabel}>PREREQUISITES</Text>
-          {prerequisites.map((p, i) => (
-            <TouchableOpacity
-              key={p.id}
-              style={styles.listItem}
-              onPress={() => router.push(`/concept/${p.id}`)}
-            >
-              <Text style={styles.listItemNum}>{i + 1}</Text>
-              <Text style={styles.listItemText}>{p.title}</Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity
+            style={[styles.smBtn, styles.smBtnPrimary]}
+            onPress={() => setShowAddPrereq(true)}
+          >
+            <View style={{flexDirection: "row", alignItems: "center", gap: 4}}><Plus size={14} color={COLORS.white} /><Text style={[styles.smBtnText, { color: COLORS.white }]}>Add</Text></View>
+          </TouchableOpacity>
         </View>
-      )}
+        
+        {prerequisites && prerequisites.length > 0 ? (
+          prerequisites.map((p, i) => (
+            <View key={p.id} style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
+              <TouchableOpacity
+                style={[styles.listItem, {flex: 1}]}
+                onPress={() => router.push(`/concept/${p.id}`)}
+              >
+                <Text style={styles.listItemNum}>{i + 1}</Text>
+                <Text style={styles.listItemText}>{p.title}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={async () => {
+                try {
+                  await removePrerequisite(id!, p.id);
+                  refetchPrerequisites();
+                } catch {
+                  Alert.alert('Error', 'Failed to remove prerequisite');
+                }
+              }}>
+                <X size={16} color={COLORS.red} />
+              </TouchableOpacity>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No prerequisites yet.</Text>
+        )}
+      </View>
 
       {/* Related */}
       {related && related.length > 0 && (
@@ -493,6 +568,54 @@ export default function ConceptDetailScreen() {
               style={[styles.input, { width: 80 }]}
             />
           </View>
+        </View>
+      </Modal>
+
+      {/* Add Prerequisite Modal */}
+      <Modal
+        visible={showAddPrereq}
+        title="Add Prerequisite"
+        onClose={() => {
+          setShowAddPrereq(false);
+          setSearchPrereqQuery('');
+          setPrereqSearchResults([]);
+        }}
+        footer={
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddPrereq(false)}>
+            <Text style={styles.cancelBtnText}>Close</Text>
+          </TouchableOpacity>
+        }
+      >
+        <View style={{ gap: SPACING.md, minHeight: 200 }}>
+          <TextInput
+            value={searchPrereqQuery}
+            onChangeText={setSearchPrereqQuery}
+            placeholder="Search concepts to add..."
+            placeholderTextColor={COLORS.gray600}
+            style={styles.input}
+          />
+          <ScrollView style={{ maxHeight: 200 }}>
+            {isSearching ? (
+              <Text style={styles.emptyText}>Searching...</Text>
+            ) : (
+              <>
+                {prereqSearchResults.map(concept => (
+                  <TouchableOpacity 
+                    key={concept.id} 
+                    style={[styles.listItem, { paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border }]}
+                    onPress={() => handleAddPrereq(concept.id)}
+                    disabled={addingPrereq}
+                  >
+                    <Text style={styles.listItemText}>{concept.title}</Text>
+                    <Plus size={16} color={COLORS.green} />
+                  </TouchableOpacity>
+                ))}
+                {searchPrereqQuery.length > 0 && prereqSearchResults.length === 0 && (
+                  <Text style={styles.emptyText}>No concepts found.</Text>
+                )}
+              </>
+            )}
+          </ScrollView>
         </View>
       </Modal>
     </ScrollView>

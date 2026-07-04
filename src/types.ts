@@ -145,6 +145,14 @@ export interface NotificationResponse {
   createdAt: string;
 }
 
+export interface NotificationResponse {
+  id: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  userId: string;
+}
+
 export interface PageResponse<T> {
   content: T[];
   totalElements: number;

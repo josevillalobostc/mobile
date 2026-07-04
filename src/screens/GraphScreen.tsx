@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput,
-  StyleSheet, Dimensions, PanResponder, ActivityIndicator
+  StyleSheet, Dimensions, PanResponder, ActivityIndicator,
+  Modal, Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Circle, Line, Text as SvgText, G } from 'react-native-svg';
 import { Accelerometer } from 'expo-sensors';
-import { Search, RefreshCw, X, Link as LinkIcon, BookOpen, PenTool } from 'lucide-react-native';
+import { Search, RefreshCw, X, Link as LinkIcon, BookOpen, PenTool, UserPlus } from 'lucide-react-native';
 import * as d3 from 'd3-force';
 
-import { getPublicGraph, getNeighborhoodGraph, searchConcepts, getMyWorkspaces, getPublicWorkspace, getGraphByWorkspace } from '../api';
+import { getPublicGraph, getNeighborhoodGraph, searchConcepts, getMyWorkspaces, getPublicWorkspace, getGraphByWorkspace, addWorkspaceMember } from '../api';
 import type { GraphNode, GraphResponse, ConceptResponse, WorkspaceResponse } from '../types';
 import { ScrollView } from 'react-native';
 import { useDebounce } from '../hooks/useDebounce';
@@ -64,6 +65,31 @@ export default function GraphScreen() {
   // ─── Selection / subgraph ──────────────────────────────────────────────────
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [subgraph, setSubgraph] = useState<GraphResponse | null>(null);
+
+  // ─── Add Member ────────────────────────────────────────────────────────────
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [newMemberId, setNewMemberId] = useState('');
+  const [isAddingMember, setIsAddingMember] = useState(false);
+
+  const handleAddMember = async () => {
+    if (!newMemberId.trim()) {
+      Alert.alert('Error', 'Please enter a User ID');
+      return;
+    }
+    if (!selectedWorkspaceId) return;
+
+    setIsAddingMember(true);
+    try {
+      await addWorkspaceMember(selectedWorkspaceId, newMemberId.trim());
+      Alert.alert('Success', 'Member added successfully!');
+      setShowAddMemberModal(false);
+      setNewMemberId('');
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.message || 'Failed to add member');
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
 
   // ─── Search ────────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -324,6 +350,14 @@ export default function GraphScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            {selectedWorkspaceId && (
+              <TouchableOpacity
+                style={styles.addMemberBtn}
+                onPress={() => setShowAddMemberModal(true)}
+              >
+                <UserPlus size={16} color={COLORS.gray400} />
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -461,6 +495,46 @@ export default function GraphScreen() {
           <PenTool size={14} color="#C4B5FD" />
           <Text style={styles.fabText}>Capture Note</Text>
         </TouchableOpacity>
+
+        {/* Add Member Modal */}
+        <Modal
+          visible={showAddMemberModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowAddMemberModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Add Member</Text>
+              <Text style={styles.modalDesc}>Enter the User ID of the person you want to invite.</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="User ID..."
+                placeholderTextColor={COLORS.gray500}
+                value={newMemberId}
+                onChangeText={setNewMemberId}
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => {
+                    setShowAddMemberModal(false);
+                    setNewMemberId('');
+                  }}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalAddBtn}
+                  onPress={handleAddMember}
+                  disabled={isAddingMember || !newMemberId.trim()}
+                >
+                  <Text style={styles.modalAddText}>{isAddingMember ? 'Adding...' : 'Add Member'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </View>
   );
@@ -471,6 +545,17 @@ const styles = StyleSheet.create({
   uiLayer: { ...StyleSheet.absoluteFillObject, paddingTop: SPACING.md },
   workspaceContainer: {
     marginBottom: SPACING.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: SPACING.md,
+  },
+  addMemberBtn: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.full,
+    padding: SPACING.sm,
+    marginLeft: SPACING.sm,
   },
   workspaceChip: {
     backgroundColor: COLORS.surface,
@@ -594,4 +679,42 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   fabText: { color: '#C4B5FD', fontWeight: '700', fontSize: FONT.sm },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  modalContent: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalTitle: { color: COLORS.white, fontSize: FONT.lg, fontWeight: '700', marginBottom: SPACING.xs },
+  modalDesc: { color: COLORS.gray400, fontSize: FONT.sm, marginBottom: SPACING.md },
+  modalInput: {
+    backgroundColor: COLORS.dark,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.sm,
+    color: COLORS.white,
+    padding: SPACING.md,
+    fontSize: FONT.base,
+    marginBottom: SPACING.lg,
+  },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: SPACING.md },
+  modalCancelBtn: { padding: SPACING.sm },
+  modalCancelText: { color: COLORS.gray400, fontSize: FONT.base },
+  modalAddBtn: {
+    backgroundColor: COLORS.green,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    justifyContent: 'center',
+  },
+  modalAddText: { color: COLORS.dark, fontWeight: '700', fontSize: FONT.base },
 });
